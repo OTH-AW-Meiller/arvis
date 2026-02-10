@@ -25,5 +25,10 @@ python3 -m http.server 8000
 
 2. Öffnen Sie im Browser: `http://localhost:8000/`
 
+Demo
+Das Demo ist [hier unter einer GitHub-Seite erreichbar](https://oth-aw-meiller.github.io/arvis/index.html)
+
+
+
 Lizenz / Hinweise
 - Die Datenquelle ist oben angegeben. Dieses Repository enthält ein einfaches Visualisierungsbeispiel; bei Weiterverwendung der Daten bitte die Quelle angeben.
