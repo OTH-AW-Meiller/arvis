@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D Bar Chart — Germany Population</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #container { width: 100vw; height: 100vh; overflow: hidden; }
+    #ui { position: absolute; top: 10px; left: 10px; color: #222; z-index: 2; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <div id="ui">
+  </div>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js"
+    }
+  }
+  </script>
+  <script type="module" src="/scripts/three-barchart.js"></script>
+</body>
+</html>

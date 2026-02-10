@@ -1,0 +1,199 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/controls/OrbitControls.js';
+
+const container = document.getElementById('container');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf7f7fb);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 10000);
+camera.position.set(0, 200, 400);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+// enable shadows
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+container.appendChild(renderer.domElement);
+
+// enable OrbitControls for rotation
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 20;
+controls.maxDistance = 2000;
+controls.saveState();
+
+// lights
+const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+hemi.position.set(0, 200, 0);
+scene.add(hemi);
+const dir = new THREE.DirectionalLight(0xffffff, 0.9);
+dir.position.set(200, 300, 200);
+dir.castShadow = true;
+dir.shadow.mapSize.set(2048, 2048);
+dir.shadow.bias = -0.0005;
+// configure shadow camera (orthographic for directional light)
+const s = 500;
+dir.shadow.camera.left = -s;
+dir.shadow.camera.right = s;
+dir.shadow.camera.top = s;
+dir.shadow.camera.bottom = -s;
+dir.shadow.camera.near = 50;
+dir.shadow.camera.far = 1000;
+scene.add(dir);
+
+// axes grid removed — clean view
+
+let barsGroup = new THREE.Group();
+scene.add(barsGroup);
+// set directional light target after barsGroup exists
+if (dir) dir.target = barsGroup;
+
+// add ground plane to receive shadows
+const groundGeo = new THREE.PlaneGeometry(300, 300);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0xececec });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = 0;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// load CSV and build bars
+async function loadAndBuild() {
+  // load local groups CSV and build bars (no external fetches)
+  const res = await fetch('/data/data_groups.csv');
+  if (!res.ok) throw new Error('Failed to load /data/data_groups.csv');
+  const txt = await res.text();
+  const rows = txt.trim().split('\n').filter(r => r.trim());
+  const header = rows.shift().split(',');
+  const data = rows.map(r => {
+    const cols = r.split(',').map(c => c.trim());
+    const year = parseInt(cols[0], 10);
+    const vals = cols.slice(1).map(Number);
+    return { year, values: vals };
+  });
+  buildBars(data);
+}
+
+  // removed external World Bank fetching — using only local CSV data
+
+
+function buildBars(data) {
+  // clear
+  while (barsGroup.children.length) barsGroup.remove(barsGroup.children[0]);
+
+  // data: array of {year, total, values[]} where values length == number of groups
+  const years = data.map(d => d.year);
+  const groupsCount = data[0] ? data[0].values.length : 0;
+
+  // compute global max across all groups for consistent scaling
+  let globalMax = 0;
+  data.forEach(d => d.values.forEach(v => { if (v > globalMax) globalMax = v; }));
+  if (globalMax === 0) globalMax = 1;
+
+  const barWidth = 1.2;
+  const gap = 1.0;
+  const depth = 6; // thickness along z for each bar
+  const rowSpacing = 20; // distance between group rows along z
+
+  const totalWidth = data.length * (barWidth + gap);
+  const startX = -totalWidth / 2 + (barWidth + gap) / 2;
+
+  // create bars: rows = groups, columns = years
+  for (let g = 0; g < groupsCount; g++) {
+    const rowGroup = new THREE.Group();
+    const z = (g - (groupsCount - 1) / 2) * rowSpacing;
+    rowGroup.position.z = z;
+
+    data.forEach((d, i) => {
+      const val = d.values[g] || 0;
+      const h = (val / globalMax) * 200;
+      const geometry = new THREE.BoxGeometry(barWidth, h, depth);
+      const hue = 0.6 - (g / Math.max(1, groupsCount - 1)) * 0.5;
+      const color = new THREE.Color().setHSL(hue, 0.7, 0.5);
+      const material = new THREE.MeshStandardMaterial({ color });
+      const mesh = new THREE.Mesh(geometry, material);
+      // enable shadows for bars
+      mesh.castShadow = true;
+      mesh.receiveShadow = false;
+      mesh.position.x = startX + i * (barWidth + gap);
+      mesh.position.y = h / 2;
+      mesh.userData = { year: d.year, value: val, group: g };
+      rowGroup.add(mesh);
+    });
+
+    barsGroup.add(rowGroup);
+  }
+
+  // add simple DOM legend for groups
+  const ui = document.getElementById('ui');
+  const existing = document.getElementById('legend');
+  if (existing) existing.remove();
+  const legend = document.createElement('div');
+  legend.id = 'legend';
+  legend.style.marginTop = '8px';
+  legend.innerHTML = '<strong>Groups</strong><br/>';
+  const groupNames = ['0-5','6-14','15-19','20-44','45-64','65+'];
+  for (let g = 0; g < groupsCount; g++) {
+    const hue = 0.6 - (g / Math.max(1, groupsCount - 1)) * 0.5;
+    const color = new THREE.Color().setHSL(hue, 0.7, 0.5).getStyle();
+    const item = document.createElement('div');
+    item.innerHTML = `<span style="display:inline-block;width:12px;height:12px;background:${color};margin-right:6px;"></span>${groupNames[g] || 'group '+g}`;
+    legend.appendChild(item);
+  }
+  ui.appendChild(legend);
+}
+
+// interaction: hover tooltip
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.createElement('div');
+tooltip.style.position = 'absolute';
+tooltip.style.pointerEvents = 'none';
+tooltip.style.background = 'rgba(0,0,0,0.7)';
+tooltip.style.color = '#fff';
+tooltip.style.padding = '6px 8px';
+tooltip.style.borderRadius = '4px';
+tooltip.style.fontSize = '12px';
+tooltip.style.display = 'none';
+document.body.appendChild(tooltip);
+
+function onPointerMove(e) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(barsGroup.children.flatMap(g => g.children), true);
+  if (intersects.length) {
+    const obj = intersects[0].object.userData;
+    if (obj && obj.year) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = e.clientX + 10 + 'px';
+      tooltip.style.top = e.clientY + 10 + 'px';
+      tooltip.innerHTML = `<strong>${obj.year}</strong><br/>Group: ${obj.group} — ${obj.value.toLocaleString()} persons`;
+    }
+  } else {
+    tooltip.style.display = 'none';
+  }
+}
+
+window.addEventListener('pointermove', onPointerMove);
+
+// animation loop: update controls and render continuously for smooth rotation
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// start
+loadAndBuild().then(() => animate()).catch(err => {
+  console.error(err);
+});
