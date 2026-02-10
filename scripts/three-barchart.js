@@ -61,7 +61,7 @@ scene.add(ground);
 // load CSV and build bars
 async function loadAndBuild() {
   // load local groups CSV and build bars (no external fetches)
-  const res = await fetch('/data/data_groups.csv');
+  const res = await fetch('data/data_groups.csv');
   if (!res.ok) throw new Error('Failed to load /data/data_groups.csv');
   const txt = await res.text();
   const rows = txt.trim().split('\n').filter(r => r.trim());
