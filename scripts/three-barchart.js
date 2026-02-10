@@ -133,7 +133,7 @@ function buildBars(data) {
   legend.id = 'legend';
   legend.style.marginTop = '8px';
   legend.innerHTML = '<strong>Groups</strong><br/>';
-  const groupNames = ['0-5','6-14','15-19','20-44','45-64','65+'];
+  const groupNames = ['1: 0-5','2: 6-14','3: 15-19','4: 20-44','5: 45-64','6: 65+'];
   for (let g = 0; g < groupsCount; g++) {
     const hue = 0.6 - (g / Math.max(1, groupsCount - 1)) * 0.5;
     const color = new THREE.Color().setHSL(hue, 0.7, 0.5).getStyle();
@@ -171,7 +171,7 @@ function onPointerMove(e) {
       tooltip.style.display = 'block';
       tooltip.style.left = e.clientX + 10 + 'px';
       tooltip.style.top = e.clientY + 10 + 'px';
-      tooltip.innerHTML = `<strong>${obj.year}</strong><br/>Group: ${obj.group} — ${obj.value.toLocaleString()} persons`;
+      tooltip.innerHTML = `<strong>${obj.year}</strong><br/>Group: ${obj.group + 1} — ${obj.value.toLocaleString()} persons`;
     }
   } else {
     tooltip.style.display = 'none';
