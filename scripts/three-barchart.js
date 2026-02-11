@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/controls/OrbitControls.js';
+import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/webxr/ARButton.js';
 
 const container = document.getElementById('container');
 const scene = new THREE.Scene();
@@ -10,6 +11,7 @@ camera.position.set(0, 200, 400);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true; // enable WebXR
 // enable shadows
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -57,6 +59,14 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.y = 0;
 ground.receiveShadow = true;
 scene.add(ground);
+
+// Reticle for AR hit-test placement
+const reticleGeometry = new THREE.RingGeometry(0.12, 0.15, 32).rotateX(-Math.PI / 2);
+const reticleMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+const reticle = new THREE.Mesh(reticleGeometry, reticleMaterial);
+reticle.matrixAutoUpdate = false;
+reticle.visible = false;
+scene.add(reticle);
 
 // load CSV and build bars
 async function loadAndBuild() {
@@ -193,7 +203,96 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// WebXR / AR setup: add AR button to UI when supported
+const ui = document.getElementById('ui');
+if (navigator.xr) {
+  try {
+    const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] });
+    // put AR button inside our UI container
+    ui.appendChild(arButton);
+  } catch (e) {
+    console.warn('ARButton failed to create:', e);
+  }
+} else {
+  // for browsers without WebXR, show a hint
+  const hint = document.createElement('div');
+  hint.style.marginTop = '8px';
+  hint.textContent = 'WebXR not available — fallback 3D view enabled.';
+  ui.appendChild(hint);
+}
+
+// XR hit-test variables
+let hitTestSource = null;
+let hitTestSourceRequested = false;
+
+// controller for select events in AR
+const controller = renderer.xr.getController(0);
+controller.addEventListener('select', () => {
+  if (reticle.visible) {
+    // place the barsGroup at the reticle position and orientation
+    barsGroup.position.setFromMatrixPosition(reticle.matrix);
+    // copy orientation
+    const m = new THREE.Matrix4();
+    m.extractRotation(reticle.matrix);
+    barsGroup.quaternion.setFromRotationMatrix(m);
+    barsGroup.visible = true;
+    // hide reticle after placing
+    reticle.visible = false;
+  }
+});
+scene.add(controller);
+
+// render function used by both XR and non-XR
+function render(timestamp, frame) {
+  // handle XR hit-test
+  if (frame) {
+    const session = renderer.xr.getSession();
+    if (!hitTestSourceRequested) {
+      session.requestReferenceSpace('viewer').then((refSpace) => {
+        session.requestHitTestSource({ space: refSpace }).then((source) => {
+          hitTestSource = source;
+        });
+      });
+      session.addEventListener('end', () => {
+        hitTestSourceRequested = false;
+        hitTestSource = null;
+      });
+      hitTestSourceRequested = true;
+    }
+
+    if (hitTestSource) {
+      const referenceSpace = renderer.xr.getReferenceSpace();
+      const hitTestResults = frame.getHitTestResults(hitTestSource);
+      if (hitTestResults.length > 0) {
+        const hit = hitTestResults[0];
+        const pose = hit.getPose(referenceSpace);
+        reticle.visible = true;
+        reticle.matrix.fromArray(pose.transform.matrix);
+      } else {
+        reticle.visible = false;
+      }
+    }
+  }
+
+  // when in AR mode, disable orbit controls and hide ground
+  if (renderer.xr.isPresenting) {
+    controls.enabled = false;
+    ground.visible = false;
+  } else {
+    controls.enabled = true;
+    ground.visible = true;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// Use setAnimationLoop to support XR frame loop; this also works in non-XR browsers
+function startLoop() {
+  renderer.setAnimationLoop(render);
+}
+
 // start
-loadAndBuild().then(() => animate()).catch(err => {
+loadAndBuild().then(() => startLoop()).catch(err => {
   console.error(err);
 });
