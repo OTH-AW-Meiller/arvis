@@ -228,19 +228,46 @@ if (navigator.xr) {
 let hitTestSource = null;
 let hitTestSourceRequested = false;
 
+// surface placement offset to avoid z-fighting (meters)
+const SURFACE_OFFSET = 0.005;
+
+// helper: place `barsGroup` on top of a detected horizontal surface represented by a reticle matrix
+function placeBarsAtReticle(matrix) {
+  // extract world position from reticle matrix
+  const pos = new THREE.Vector3();
+  pos.setFromMatrixPosition(matrix);
+
+  // extract yaw from reticle rotation but keep bars upright (no tilt)
+  const rot = new THREE.Quaternion();
+  matrix.decompose(new THREE.Vector3(), rot, new THREE.Vector3());
+  const e = new THREE.Euler().setFromQuaternion(rot, 'YXZ');
+  const yaw = e.y;
+
+  // apply scale for AR placement so bounding box is computed correctly
+  barsGroup.scale.setScalar(AR_SCALE);
+
+  // place horizontally at the reticle x/z and compute vertical offset so base sits on surface
+  barsGroup.position.set(pos.x, 0, pos.z);
+  barsGroup.rotation.set(0, yaw, 0);
+  barsGroup.updateMatrixWorld(true);
+
+  // compute world-space bounding box of the group
+  const box = new THREE.Box3().setFromObject(barsGroup);
+  const minY = box.min.y;
+
+  // set group y so the bottom of the box is at the reticle y plus small offset
+  const targetY = pos.y - minY + SURFACE_OFFSET;
+  barsGroup.position.y = targetY;
+  barsGroup.updateMatrixWorld(true);
+
+  barsGroup.visible = true;
+}
+
 // controller for select events in AR
 const controller = renderer.xr.getController(0);
 controller.addEventListener('select', () => {
   if (reticle.visible) {
-    // place the barsGroup at the reticle position and orientation
-    barsGroup.position.setFromMatrixPosition(reticle.matrix);
-    // copy orientation
-    const m = new THREE.Matrix4();
-    m.extractRotation(reticle.matrix);
-    barsGroup.quaternion.setFromRotationMatrix(m);
-    barsGroup.visible = true;
-    // when placed in AR, use the AR scale so the chart appears smaller
-    barsGroup.scale.setScalar(AR_SCALE);
+    placeBarsAtReticle(reticle.matrix);
     // hide reticle after placing
     reticle.visible = false;
   }
