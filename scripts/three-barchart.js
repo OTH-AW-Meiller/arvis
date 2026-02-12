@@ -49,7 +49,7 @@ scene.add(dir);
 let barsGroup = new THREE.Group();
 scene.add(barsGroup);
 // AR scaling: make the scene smaller when presenting in AR
-const AR_SCALE = 0.01; // adjust this factor to taste (0.25 = 25%)
+const AR_SCALE = 0.001; // adjust this factor to taste (0.25 = 25%)
 const NON_AR_SCALE = 1;
 // set directional light target after barsGroup exists
 if (dir) dir.target = barsGroup;
