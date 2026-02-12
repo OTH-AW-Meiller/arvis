@@ -25,6 +25,9 @@ controls.minDistance = 20;
 controls.maxDistance = 2000;
 controls.saveState();
 
+// track XR presenting state to perform one-time enter/exit actions
+let _prevXRPresenting = false;
+
 // lights
 const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
 hemi.position.set(0, 200, 0);
@@ -169,6 +172,9 @@ tooltip.style.display = 'none';
 document.body.appendChild(tooltip);
 
 function onPointerMove(e) {
+  // ignore pointer interactions while in AR presentation
+  if (renderer.xr && renderer.xr.isPresenting) return;
+
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -303,17 +309,30 @@ function render(timestamp, frame) {
     }
   }
 
-  // when in AR mode, disable orbit controls and hide ground
+  // when entering/exiting AR mode, perform one-time DOM and control adjustments
   if (renderer.xr.isPresenting) {
-    controls.enabled = false;
+    // just entered AR
+    if (!_prevXRPresenting) {
+      controls.enabled = false;
+      // disable DOM pointer interaction so touch taps don't drive OrbitControls
+      renderer.domElement.style.touchAction = 'none';
+      renderer.domElement.style.pointerEvents = 'none';
+    }
     ground.visible = false;
     // scale down the chart for AR presentation
     barsGroup.scale.setScalar(AR_SCALE);
+    _prevXRPresenting = true;
   } else {
-    controls.enabled = true;
+    // just exited AR
+    if (_prevXRPresenting) {
+      controls.enabled = true;
+      renderer.domElement.style.touchAction = '';
+      renderer.domElement.style.pointerEvents = '';
+    }
     ground.visible = true;
     // restore normal scale when not in AR
     barsGroup.scale.setScalar(NON_AR_SCALE);
+    _prevXRPresenting = false;
   }
 
   controls.update();
