@@ -88,9 +88,6 @@ async function loadAndBuild() {
   buildBars(data);
 }
 
-  // removed external World Bank fetching — using only local CSV data
-
-
 function buildBars(data) {
   // clear
   while (barsGroup.children.length) barsGroup.remove(barsGroup.children[0]);
