@@ -48,6 +48,9 @@ scene.add(dir);
 
 let barsGroup = new THREE.Group();
 scene.add(barsGroup);
+// AR scaling: make the scene smaller when presenting in AR
+const AR_SCALE = 0.25; // adjust this factor to taste (0.25 = 25%)
+const NON_AR_SCALE = 1;
 // set directional light target after barsGroup exists
 if (dir) dir.target = barsGroup;
 
@@ -236,6 +239,8 @@ controller.addEventListener('select', () => {
     m.extractRotation(reticle.matrix);
     barsGroup.quaternion.setFromRotationMatrix(m);
     barsGroup.visible = true;
+    // when placed in AR, use the AR scale so the chart appears smaller
+    barsGroup.scale.setScalar(AR_SCALE);
     // hide reticle after placing
     reticle.visible = false;
   }
@@ -278,9 +283,13 @@ function render(timestamp, frame) {
   if (renderer.xr.isPresenting) {
     controls.enabled = false;
     ground.visible = false;
+    // scale down the chart for AR presentation
+    barsGroup.scale.setScalar(AR_SCALE);
   } else {
     controls.enabled = true;
     ground.visible = true;
+    // restore normal scale when not in AR
+    barsGroup.scale.setScalar(NON_AR_SCALE);
   }
 
   controls.update();
