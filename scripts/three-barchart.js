@@ -277,7 +277,7 @@ function render(timestamp, frame) {
   if (frame) {
     const session = renderer.xr.getSession();
     if (!hitTestSourceRequested) {
-      session.requestReferenceSpace('viewer').then((refSpace) => {
+      session.requestReferenceSpace('bounded-floor').then((refSpace) => {
         session.requestHitTestSource({ space: refSpace }).then((source) => {
           hitTestSource = source;
         });
