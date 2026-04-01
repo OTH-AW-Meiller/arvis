@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'OrbitControls';
+import Papa from 'papaparse';
 
 const container = document.getElementById('container');
 const scene = new THREE.Scene();
@@ -64,14 +65,26 @@ async function loadAndBuild() {
   const res = await fetch('data/data_groups.csv');
   if (!res.ok) throw new Error('Failed to load /data/data_groups.csv');
   const txt = await res.text();
-  const rows = txt.trim().split('\n').filter(r => r.trim());
-  const header = rows.shift().split(',');
-  const data = rows.map(r => {
-    const cols = r.split(',').map(c => c.trim());
-    const year = parseInt(cols[0], 10);
-    const vals = cols.slice(1).map(Number);
-    return { year, values: vals };
+  const parsed = Papa.parse(txt, {
+    dynamicTyping: true,
+    skipEmptyLines: true
   });
+  const rows = parsed.data;
+  const data = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cols = rows[i];
+    if (!Array.isArray(cols) || !Number.isFinite(cols[0])) continue;
+
+    const values = [];
+    for (let j = 1; j < cols.length; j++) {
+      values.push(Number(cols[j]) || 0);
+    }
+
+    data.push({
+      year: cols[0],
+      values
+    });
+  }
   buildBars(data);
 }
 
