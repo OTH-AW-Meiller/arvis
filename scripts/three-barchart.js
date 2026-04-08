@@ -1,10 +1,18 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'OrbitControls';
 import Papa from 'papaparse';
+import { GLTFLoader } from 'gltf';
+
 
 const container = document.getElementById('container');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf7f7fb);
+
+
+const loader = new GLTFLoader();
+const arrow = await loader.loadAsync( 'assets/arrow.glb' );
+scene.add( arrow.scene );
+
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 10000);
 camera.position.set(0, 200, 400);
@@ -133,6 +141,12 @@ function buildBars(data) {
       mesh.position.y = h / 2;
       mesh.userData = { year: d.year, value: val, group: g };
       rowGroup.add(mesh);
+      let a = arrow.scene.clone();
+      a.position.copy(mesh.position);
+      a.position.y += h / 2 + 0.5;
+     
+     
+      rowGroup.add(a);
     });
 
     barsGroup.add(rowGroup);
